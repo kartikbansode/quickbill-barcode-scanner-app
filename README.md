@@ -4,6 +4,8 @@
 > 
 > **Release Date:** August 2026
 
+<a href="https://github.com/kartikbansode/quickbill-barcode-scanner-app/releases/download/v1.0.0/QuickBill-Barcode-Scanner-v1.0.0.apk">Download (Apk v1.0.0)</a>
+
 QuickBill Barcode Scanner is an Android camera-based barcode scanning application designed to work with the QuickBill desktop billing system.
 
 The app turns an Android phone into a network barcode scanner and camera source, allowing QuickBill Desktop to receive barcode scans over the local network.
