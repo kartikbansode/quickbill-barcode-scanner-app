@@ -59,3 +59,20 @@ Clone the repository:
 
 ```bash
 git clone https://github.com/kartikbansode/quickbill-barcode-scanner-app.git
+```
+
+---
+
+## License
+
+This project is licensed under the MIT License.
+
+---
+
+## Contact
+
+**LinkedIn**  
+https://www.linkedin.com/in/kartikbansode
+
+**GitHub**  
+https://github.com/kartikbansode
