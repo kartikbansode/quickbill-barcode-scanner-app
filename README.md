@@ -1,0 +1,1 @@
+# quickbill-barcode-scanner-app
