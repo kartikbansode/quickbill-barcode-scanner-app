@@ -25,7 +25,7 @@
     Releases
   </a>
   &bull;
-  <a href="https://github.com/kartikbansode/quickbill-barcode-scanner">
+  <a href="https://github.com/kartikbansode/quickbill-barcode-scanner-app">
     Repository
   </a>
 </p>
