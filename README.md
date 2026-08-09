@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/kartikbansode/quickbill/releases">
+  <a href="https://github.com/kartikbansode/quickbill">
     QuickBill Desktop
   </a>
   &bull;
