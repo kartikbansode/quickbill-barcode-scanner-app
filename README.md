@@ -1,16 +1,101 @@
-# QuickBill - Barcode Scanner
+<p align="center">
+  <a href="https://github.com/kartikbansode/quickbill-customer-display-app">
+    <img width="80" height="80" alt="logo" src="https://github.com/user-attachments/assets/eca0e1aa-8784-4a37-90d1-c6d864a53941" />
+  </a>
+</p>
 
-> **Latest Version:** 1.0.0
-> 
-> **Release Date:** August 2026
+<h1 align="center">
+  QuickBill Barcode Scanner
+</h1>
 
-<a href="https://github.com/kartikbansode/quickbill-barcode-scanner-app/releases/download/v1.0.0/QuickBill-Barcode-Scanner-v1.0.0.apk">Download (Apk v1.0.0)</a>
+<p align="center">
+  <strong>Android Barcode Scanning Companion for QuickBill</strong>
+</p>
 
-QuickBill Barcode Scanner is an Android camera-based barcode scanning application designed to work with the QuickBill desktop billing system.
+<p align="center">
+  Fast barcode scanning · Product lookup · QuickBill integration
+</p>
 
-The app turns an Android phone into a network barcode scanner and camera source, allowing QuickBill Desktop to receive barcode scans over the local network.
+<p align="center">
+  <a href="https://github.com/kartikbansode/quickbill/releases">
+    QuickBill Desktop
+  </a>
+  &bull;
+  <a href="https://github.com/kartikbansode/quickbill-barcode-scanner/releases">
+    Releases
+  </a>
+  &bull;
+  <a href="https://github.com/kartikbansode/quickbill-barcode-scanner">
+    Repository
+  </a>
+</p>
 
----
+<p align="center">
+  <a href="https://github.com/kartikbansode/quickbill-barcode-scanner-app/releases/download/v1.0.0/QuickBill-Barcode-Scanner-v1.0.0.apk">
+    <strong>Download Android App v1.0.0</strong>
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/kartikbansode/quickbill-barcode-scanner/releases">
+    <img
+      src="https://img.shields.io/badge/Releases-Download-blue"
+      alt="Releases"
+    />
+  </a>
+
+  <a href="https://developer.android.com/about/versions">
+    <img
+      src="https://img.shields.io/badge/Android-8.0%2B-green"
+      alt="Android 8.0+"
+    />
+  </a>
+
+  <a href="https://kotlinlang.org/">
+    <img
+      src="https://img.shields.io/badge/Kotlin-Android-purple"
+      alt="Kotlin"
+    />
+  </a>
+
+  <a href="https://developer.android.com/develop/ui/compose">
+    <img
+      src="https://img.shields.io/badge/Jetpack%20Compose-Material%203-orange"
+      alt="Jetpack Compose"
+    />
+  </a>
+</p>
+
+<p align="center">
+  QuickBill Barcode Scanner is a companion Android application designed
+  to work with the QuickBill Desktop billing system. It provides a
+  dedicated mobile barcode-scanning interface for quickly scanning
+  products and sending barcode information to the desktop application
+  for use in billing and product workflows.
+</p>
+
+<p align="center">
+  <strong>Part of the QuickBill Ecosystem</strong>
+  <br>
+  QuickBill Desktop remains the core billing system and authoritative
+  source for products, inventory, bills, payments and transactions.
+</p>
+
+<p align="center">
+  <a href="https://github.com/kartikbansode/quickbill">
+    QuickBill Desktop
+  </a>
+  &nbsp;·&nbsp;
+  Core desktop billing and inventory management application
+  <br>
+  <a href="https://github.com/kartikbansode/quickbill-customer-display-app">
+    QuickBill Customer Display
+  </a>
+  &nbsp;·&nbsp;
+  Companion Android application for real-time customer-facing billing,
+  payment, QR and transaction display
+</p>
+
 
 ## Features
 
@@ -67,7 +152,15 @@ git clone https://github.com/kartikbansode/quickbill-barcode-scanner-app.git
 
 ## License
 
-This project is licensed under the MIT License.
+This project is proprietary software.
+
+Copyright © 2026 Kartik Bansode. All Rights Reserved.
+
+The source code is publicly available for viewing, educational, portfolio, and evaluation purposes only.
+
+No permission is granted to copy, reproduce, modify, redistribute, republish, commercially use, sublicense, sell, or create derivative works from this software or its source code without prior written permission from the copyright holder.
+
+For complete terms and restrictions, see the [LICENSE](https://github.com/kartikbansode/quickbill-barcode-scanner/blob/main/LICENSE) file.
 
 ---
 
