@@ -1,21 +1,58 @@
-MIT License
+QUICKBILL BARCODE SCANNER PROPRIETARY LICENSE
+Copyright © 2026 Kartik Bansode. All Rights Reserved.
 
-Copyright (c) 2026 Kartik 
+This software and its source code are proprietary intellectual property
+of the copyright holder.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+The source code is publicly available for viewing, educational,
+portfolio, and evaluation purposes only.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+PERMITTED USE
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+You may:
+
+- View and inspect the source code.
+- Study the source code for educational purposes.
+- Evaluate the project for academic, professional, recruitment,
+  portfolio, or demonstration purposes.
+
+RESTRICTED USE
+
+Without prior written permission from the copyright holder, you may NOT:
+
+- Copy or reproduce the source code or substantial portions of it.
+- Modify, adapt, or create derivative works from the source code.
+- Redistribute or republish the source code or any substantial portion
+  of the project.
+- Use the source code or software for commercial purposes.
+- Sell, sublicense, rent, lease, or otherwise transfer the software.
+- Incorporate the source code or substantial portions of it into
+  another software project.
+- Publish modified or substantially copied versions of the project.
+- Remove, alter, or obscure copyright or proprietary notices.
+
+NO LICENSE GRANT
+
+Except for the limited rights expressly granted under the
+"PERMITTED USE" section, no license or other rights are granted,
+whether express or implied, under any copyright, patent, trademark,
+or other intellectual property rights.
+
+THIRD-PARTY COMPONENTS
+
+This license applies only to the original work contained in this
+repository. Third-party libraries, frameworks, dependencies, assets,
+and other components remain subject to their respective licenses.
+
+PERMISSION
+
+Any use not expressly permitted by this license requires prior written
+permission from the copyright holder.
+
+DISCLAIMER
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW.
+
+Copyright © 2026 Kartik Bansode.
+All Rights Reserved.
