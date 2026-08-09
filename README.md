@@ -64,6 +64,12 @@
       alt="Jetpack Compose"
     />
   </a>
+  <a href="https://github.com/kartikbansode/quickbill-barcode-scanner-app/blob/main/LICENSE">
+  <img
+    src="https://img.shields.io/badge/LICENSE-green"
+    alt="License"
+  />
+  </a>
 </p>
 
 <p align="center">
