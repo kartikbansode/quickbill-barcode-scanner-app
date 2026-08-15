@@ -28,8 +28,8 @@ android {
         applicationId = "com.quickbill.barcodescanner"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner =
             "androidx.test.runner.AndroidJUnitRunner"
@@ -89,7 +89,6 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
 
-    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     testImplementation(libs.junit)
 
@@ -106,7 +105,7 @@ androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
         variant.outputs.forEach { output ->
             output.outputFileName.set(
-                "QuickBill-Barcode-Scanner-v1.0.0-debug.apk"
+                "QuickBill-Barcode-Scanner-v1.1.0-debug.apk"
             )
         }
     }
@@ -114,7 +113,7 @@ androidComponents {
     onVariants(selector().withBuildType("release")) { variant ->
         variant.outputs.forEach { output ->
             output.outputFileName.set(
-                "QuickBill-Barcode-Scanner-v1.0.0.apk"
+                "QuickBill-Barcode-Scanner-v1.1.0.apk"
             )
         }
     }

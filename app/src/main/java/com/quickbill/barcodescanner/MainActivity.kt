@@ -12,13 +12,18 @@ import android.os.Looper
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import java.util.concurrent.Executors
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -81,6 +86,8 @@ import com.quickbill.barcodescanner.ui.theme.QuickBillBarcodeScannerTheme
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Collections
+import android.content.Intent
+import android.net.Uri
 
 private const val PREFS_NAME = "quickbill_scanner_settings"
 
@@ -92,16 +99,31 @@ private const val SERVER_PORT = 8080
 
 private const val FRAME_INTERVAL_MS = 125L
 
-private val BrandBlue = Color(0xFF2563EB)
-private val BrandBlueDark = Color(0xFF1D4ED8)
+data class AppColors(
+    val BrandAccent: Color,
+    val Background: Color,
+    val Surface: Color,
+    val SurfaceLight: Color,
+    val TextPrimary: Color,
+    val TextSecondary: Color,
+    val Border: Color,
+    val Green: Color = Color(0xFF22C55E)
+)
 
-private val Background = Color(0xFF07111F)
-private val Surface = Color(0xFF0F1B2D)
-private val SurfaceLight = Color(0xFF16243A)
-private val TextPrimary = Color(0xFFF8FAFC)
-private val TextSecondary = Color(0xFF94A3B8)
-private val Green = Color(0xFF22C55E)
-private val Border = Color(0xFF24344D)
+val LocalAppColors = androidx.compose.runtime.staticCompositionLocalOf<AppColors> {
+    error("No AppColors provided")
+}
+
+private val BrandBlue: Color @Composable get() = LocalAppColors.current.BrandAccent
+private val BrandBlueDark: Color @Composable get() = LocalAppColors.current.BrandAccent
+
+private val Background: Color @Composable get() = LocalAppColors.current.Background
+private val Surface: Color @Composable get() = LocalAppColors.current.Surface
+private val SurfaceLight: Color @Composable get() = LocalAppColors.current.SurfaceLight
+private val TextPrimary: Color @Composable get() = LocalAppColors.current.TextPrimary
+private val TextSecondary: Color @Composable get() = LocalAppColors.current.TextSecondary
+private val Green: Color @Composable get() = LocalAppColors.current.Green
+private val Border: Color @Composable get() = LocalAppColors.current.Border
 
 private enum class AppScreen {
     CAMERA,
@@ -122,9 +144,66 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             QuickBillBarcodeScannerTheme {
-                QuickBillScannerApp(
-                    activity = this
-                )
+                val preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                
+                var themeState by androidx.compose.runtime.remember { 
+                    androidx.compose.runtime.mutableStateOf(preferences.getString("app_theme", "System") ?: "System") 
+                }
+                var accentState by androidx.compose.runtime.remember { 
+                    androidx.compose.runtime.mutableStateOf(preferences.getString("app_accent", "Blue") ?: "Blue") 
+                }
+                
+                val isDark = when(themeState) {
+                    "Light" -> false
+                    "Dark" -> true
+                    else -> androidx.compose.foundation.isSystemInDarkTheme()
+                }
+                
+                val accentColor = when(accentState) {
+                    "Green" -> Color(0xFF10B981)
+                    "Orange" -> Color(0xFFF59E0B)
+                    else -> Color(0xFF2563EB)
+                }
+                
+                val appColors = if (isDark) {
+                    AppColors(
+                        BrandAccent = accentColor,
+                        Background = Color(0xFF07111F),
+                        Surface = Color(0xFF0F1B2D),
+                        SurfaceLight = Color(0xFF16243A),
+                        TextPrimary = Color(0xFFF8FAFC),
+                        TextSecondary = Color(0xFF94A3B8),
+                        Border = Color(0xFF24344D)
+                    )
+                } else {
+                    AppColors(
+                        BrandAccent = accentColor,
+                        Background = Color(0xFFF8FAFC),
+                        Surface = Color(0xFFFFFFFF),
+                        SurfaceLight = Color(0xFFF1F5F9),
+                        TextPrimary = Color(0xFF0F172A),
+                        TextSecondary = Color(0xFF475569),
+                        Border = Color(0xFFE2E8F0)
+                    )
+                }
+                
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalAppColors provides appColors
+                ) {
+                    QuickBillScannerApp(
+                        activity = this@MainActivity,
+                        currentTheme = themeState,
+                        currentAccent = accentState,
+                        onThemeChange = { 
+                            themeState = it
+                            preferences.edit().putString("app_theme", it).apply()
+                        },
+                        onAccentChange = { 
+                            accentState = it
+                            preferences.edit().putString("app_accent", it).apply()
+                        }
+                    )
+                }
             }
         }
     }
@@ -171,7 +250,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun QuickBillScannerApp(
-    activity: MainActivity
+    activity: MainActivity,
+    currentTheme: String,
+    currentAccent: String,
+    onThemeChange: (String) -> Unit,
+    onAccentChange: (String) -> Unit
 ) {
 
     val context = LocalContext.current
@@ -227,6 +310,18 @@ private fun QuickBillScannerApp(
                 false
             )
         )
+    }
+
+    var autoStartServer by remember {
+        mutableStateOf(preferences.getBoolean("auto_start_server", true))
+    }
+
+    var streamQuality by remember {
+        mutableStateOf(preferences.getInt("stream_quality", 72))
+    }
+
+    var streamFps by remember {
+        mutableStateOf(preferences.getInt("stream_fps", 12))
     }
 
     var keepScreenAwake by remember {
@@ -313,17 +408,20 @@ private fun QuickBillScannerApp(
         streamUrl = buildStreamUrl(context)
 
         try {
-
-            if (!server.isAlive) {
-                server.start()
+            if (autoStartServer) {
+                if (!server.isAlive) {
+                    server.start()
+                }
+                serverRunning = true
             }
-
-            serverRunning = true
-
         } catch (_: Exception) {
-
             serverRunning = false
         }
+    }
+
+    LaunchedEffect(streamQuality, streamFps) {
+        server.jpegQuality = streamQuality
+        server.targetFps = streamFps
     }
 
     /*
@@ -332,19 +430,17 @@ private fun QuickBillScannerApp(
      * The Android phone's IP is never manually entered.
      */
     LaunchedEffect(serverRunning) {
-
         if (serverRunning) {
-
             while (true) {
-
-                val newUrl =
-                    buildStreamUrl(context)
-
-                if (
-                    newUrl != streamUrl &&
-                    newUrl.isNotEmpty()
-                ) {
+                val newUrl = buildStreamUrl(context)
+                if (newUrl != streamUrl) {
                     streamUrl = newUrl
+                }
+                
+                if (!server.isAlive) {
+                    try {
+                        server.start()
+                    } catch (_: Exception) {}
                 }
 
                 kotlinx.coroutines.delay(5000)
@@ -352,68 +448,7 @@ private fun QuickBillScannerApp(
         }
     }
 
-    /*
-     * Capture frames from the camera preview and
-     * provide them to the MJPEG server.
-     *
-     * The interval is intentionally limited to reduce
-     * CPU usage and battery consumption.
-     */
-    DisposableEffect(
-        previewView,
-        server,
-        serverRunning,
-        cameraReady
-    ) {
 
-        val handler =
-            Handler(Looper.getMainLooper())
-
-        val frameRunnable =
-            object : Runnable {
-
-                override fun run() {
-
-                    if (
-                        serverRunning &&
-                        cameraReady
-                    ) {
-
-                        try {
-
-                            val bitmap =
-                                previewView.bitmap
-
-                            if (
-                                bitmap != null &&
-                                !bitmap.isRecycled
-                            ) {
-
-                                server.updateFrame(
-                                    bitmap
-                                )
-                            }
-
-                        } catch (_: Exception) {
-                        }
-                    }
-
-                    handler.postDelayed(
-                        this,
-                        FRAME_INTERVAL_MS
-                    )
-                }
-            }
-
-        handler.post(frameRunnable)
-
-        onDispose {
-
-            handler.removeCallbacks(
-                frameRunnable
-            )
-        }
-    }
 
     /*
      * Start CameraX.
@@ -437,7 +472,8 @@ private fun QuickBillScannerApp(
             context = context,
             lifecycleOwner = lifecycleOwner,
             previewView = previewView,
-            cameraMode = cameraMode
+            cameraMode = cameraMode,
+            server = server
         ) { newCamera ->
 
             camera = newCamera
@@ -527,6 +563,9 @@ private fun QuickBillScannerApp(
             }
 
             AppScreen.SETTINGS -> {
+                BackHandler {
+                    screen = AppScreen.CAMERA
+                }
 
                 SettingsScreen(
                     cameraMode = cameraMode,
@@ -534,57 +573,37 @@ private fun QuickBillScannerApp(
                     keepScreenAwake = keepScreenAwake,
                     serverRunning = serverRunning,
                     streamUrl = streamUrl,
-
-                    onBack = {
-                        screen = AppScreen.CAMERA
-                    },
-
-                    onCameraChange = { mode ->
-
+                    currentTheme = currentTheme,
+                    currentAccent = currentAccent,
+                    autoStartServer = autoStartServer,
+                    streamQuality = streamQuality,
+                    streamFps = streamFps,
+                    onBack = { screen = AppScreen.CAMERA },
+                    onCameraChange = { mode -> 
                         cameraMode = mode
-
-                        preferences.edit()
-                            .putString(
-                                PREF_CAMERA,
-                                if (
-                                    mode ==
-                                    CameraMode.FRONT
-                                ) {
-                                    "FRONT"
-                                } else {
-                                    "BACK"
-                                }
-                            )
-                            .apply()
+                        preferences.edit().putString(PREF_CAMERA, if (mode == CameraMode.FRONT) "FRONT" else "BACK").apply()
                     },
-
-                    onTorchChange = {
-                        torchEnabled = it
-                    },
-
-                    onKeepScreenAwakeChange = {
-                        keepScreenAwake = it
-                    },
-
+                    onTorchChange = { torchEnabled = it },
+                    onKeepScreenAwakeChange = { keepScreenAwake = it },
+                    onThemeChange = onThemeChange,
+                    onAccentChange = onAccentChange,
+                    onAutoStartChange = { autoStartServer = it; preferences.edit().putBoolean("auto_start_server", it).apply() },
+                    onQualityChange = { streamQuality = it; preferences.edit().putInt("stream_quality", it).apply() },
+                    onFpsChange = { streamFps = it; preferences.edit().putInt("stream_fps", it).apply() },
                     onRestartServer = {
-
-                        try {
-                            server.stop()
-                        } catch (_: Exception) {
-                        }
-
-                        try {
-
-                            server.start()
-
-                            serverRunning = true
-                            streamUrl =
-                                buildStreamUrl(context)
-
-                        } catch (_: Exception) {
-
-                            serverRunning = false
-                        }
+                        try { server.stop() } catch (_: Exception) {}
+                        try { server.start(); serverRunning = true; streamUrl = buildStreamUrl(context) } catch (_: Exception) { serverRunning = false }
+                    },
+                    onResetSettings = {
+                        preferences.edit().clear().apply()
+                        cameraMode = CameraMode.BACK
+                        torchEnabled = false
+                        keepScreenAwake = true
+                        onThemeChange("System")
+                        onAccentChange("Blue")
+                        autoStartServer = true
+                        streamQuality = 72
+                        streamFps = 12
                     }
                 )
             }
@@ -606,240 +625,132 @@ private fun CameraScreen(
     onSettings: () -> Unit,
     onTorch: () -> Unit
 ) {
-
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Background)
     ) {
-
+        // Camera Preview
         AndroidView(
-            factory = {
-                previewView
-            },
+            factory = { previewView },
             modifier = Modifier.fillMaxSize()
         )
 
-        /*
-         * Top overlay.
-         */
-        Box(
+        // Top App Bar Area
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(125.dp)
-                .background(
-                    Color.Black.copy(
-                        alpha = 0.62f
-                    )
-                )
-                .align(Alignment.TopCenter)
-        )
+                .background(Color.Black.copy(alpha = 0.85f))
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.quickbill_logo_full),
+                contentDescription = "QuickBill Barcode Scanner",
+                modifier = Modifier.height(28.dp)
+            )
 
-        /*
-         * Bottom overlay.
-         */
-        Box(
+            Spacer(modifier = Modifier.weight(1f))
+
+            IconButton(
+                onClick = onSettings,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Settings",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
+        // Bottom Info Area
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(150.dp)
-                .background(
-                    Color.Black.copy(
-                        alpha = 0.72f
-                    )
-                )
                 .align(Alignment.BottomCenter)
-        )
-
-        /*
-         * Branding.
-         */
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = 24.dp,
-                    top = 22.dp,
-                    end = 18.dp
-                ),
-            verticalAlignment =
-                Alignment.CenterVertically
+                .background(Color.Black.copy(alpha = 0.85f))
+                .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(
-                        RoundedCornerShape(14.dp)
-                    )
-                    .background(BrandBlue),
-                contentAlignment =
-                    Alignment.Center
-            ) {
-
-                Icon(
-                    imageVector =
-                        Icons.Default.CameraAlt,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier =
-                        Modifier.size(27.dp)
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.width(13.dp)
-            )
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-
-                Text(
-                    text = "QuickBill",
-                    color = TextPrimary,
-                    fontSize = 22.sp,
-                    fontWeight =
-                        FontWeight.Bold
-                )
-
-                Text(
-                    text = "BARCODE SCANNER",
-                    color = TextSecondary,
-                    fontSize = 10.sp,
-                    fontWeight =
-                        FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-            }
-
-            IconButton(
-                onClick = onSettings
-            ) {
-
-                Icon(
-                    imageVector =
-                        Icons.Default.Settings,
-                    contentDescription =
-                        "Settings",
-                    tint = Color.White,
-                    modifier =
-                        Modifier.size(28.dp)
-                )
-            }
-        }
-
-        /*
-         * Live status.
-         */
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(
-                    start = 22.dp,
-                    bottom = 88.dp
-                ),
-            verticalAlignment =
-                Alignment.CenterVertically
-        ) {
-
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (
-                            serverRunning &&
-                            cameraReady
-                        ) {
-                            Green
-                        } else {
-                            Color(0xFFEF4444)
-                        }
-                    )
-            )
-
-            Spacer(
-                modifier = Modifier.width(9.dp)
-            )
-
-            Text(
-                text =
-                    when {
-
-                        !cameraReady ->
-                            "STARTING CAMERA"
-
-                        !serverRunning ->
-                            "SERVER OFFLINE"
-
-                        else ->
-                            "LIVE CAMERA"
-                    },
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight =
-                    FontWeight.Bold,
-                letterSpacing = 1.5.sp
-            )
-        }
-
-        /*
-         * Stream URL.
-         */
-        if (streamUrl.isNotEmpty()) {
-
-            Text(
-                text = streamUrl,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(
-                        start = 22.dp,
-                        bottom = 55.dp
-                    ),
-                color = Color(0xFFCBD5E1),
-                fontSize = 12.sp
-            )
-        }
-
-        /*
-         * Torch.
-         */
-        if (cameraReady) {
-
-            IconButton(
-                onClick = onTorch,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(
-                        end = 20.dp,
-                        bottom = 54.dp
-                    )
-                    .size(54.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Color.White.copy(
-                            alpha = 0.12f
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (serverRunning && cameraReady && streamUrl.isNotEmpty()) Green 
+                            else Color(0xFFEF4444)
                         )
-                    )
-            ) {
-
-                Icon(
-                    imageVector =
-                        if (torchEnabled) {
-                            Icons.Default.FlashOn
-                        } else {
-                            Icons.Default.FlashOff
-                        },
-                    contentDescription =
-                        "Torch",
-                    tint =
-                        if (torchEnabled) {
-                            Color(0xFFFBBF24)
-                        } else {
-                            Color.White
-                        },
-                    modifier =
-                        Modifier.size(28.dp)
                 )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = when {
+                        !cameraReady -> "STARTING CAMERA..."
+                        !serverRunning -> "SERVER OFFLINE"
+                        streamUrl.isEmpty() -> "NETWORK DISCONNECTED"
+                        else -> "SCANNER READY"
+                    },
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                
+                Spacer(modifier = Modifier.weight(1f))
+                
+                if (cameraReady) {
+                    IconButton(
+                        onClick = onTorch,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(if (torchEnabled) Color.White.copy(alpha = 0.2f) else Color.Transparent)
+                    ) {
+                        Icon(
+                            imageVector = if (torchEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                            contentDescription = "Torch",
+                            tint = if (torchEnabled) Color(0xFFFBBF24) else Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
             }
+
+            if (streamUrl.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White.copy(alpha = 0.1f))
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Wifi,
+                        contentDescription = null,
+                        tint = Color(0xFFCBD5E1),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = streamUrl,
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text(
+                text = "Use the phone camera as a wireless barcode scanner for QuickBill Desktop.",
+                color = Color(0xFF94A3B8),
+                fontSize = 12.sp,
+                lineHeight = 16.sp
+            )
         }
     }
 }
@@ -855,520 +766,305 @@ private fun SettingsScreen(
     keepScreenAwake: Boolean,
     serverRunning: Boolean,
     streamUrl: String,
+    currentTheme: String,
+    currentAccent: String,
+    autoStartServer: Boolean,
+    streamQuality: Int,
+    streamFps: Int,
     onBack: () -> Unit,
     onCameraChange: (CameraMode) -> Unit,
     onTorchChange: (Boolean) -> Unit,
     onKeepScreenAwakeChange: (Boolean) -> Unit,
-    onRestartServer: () -> Unit
+    onThemeChange: (String) -> Unit,
+    onAccentChange: (String) -> Unit,
+    onAutoStartChange: (Boolean) -> Unit,
+    onQualityChange: (Int) -> Unit,
+    onFpsChange: (Int) -> Unit,
+    onRestartServer: () -> Unit,
+    onResetSettings: () -> Unit
 ) {
-
     val context = LocalContext.current
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Background)
-            .verticalScroll(
-                rememberScrollState()
-            )
-            .navigationBarsPadding()
-            .padding(
-                horizontal = 22.dp,
-                vertical = 18.dp
-            )
     ) {
-
-        /*
-         * Header.
-         */
+        // Professional App Bar
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment =
-                Alignment.CenterVertically
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Surface)
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-
-            IconButton(
-                onClick = onBack
-            ) {
-
+            IconButton(onClick = onBack) {
                 Icon(
-                    imageVector =
-                        Icons.Default.ArrowBack,
-                    contentDescription =
-                        "Back",
-                    tint = Color.White
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = TextPrimary
                 )
             }
-
-            Spacer(
-                modifier = Modifier.width(6.dp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Settings",
+                color = TextPrimary,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold
             )
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-
-                Text(
-                    text = "Settings",
-                    color = TextPrimary,
-                    fontSize = 28.sp,
-                    fontWeight =
-                        FontWeight.Bold
-                )
-
-                Text(
-                    text =
-                        "QuickBill Barcode Scanner",
-                    color = TextSecondary,
-                    fontSize = 13.sp
-                )
-            }
         }
 
-        Spacer(
-            modifier = Modifier.height(28.dp)
-        )
+        DividerLine()
 
-        /* CAMERA */
-
-        SectionTitle("CAMERA")
-
-        Spacer(
-            modifier = Modifier.height(10.dp)
-        )
-
-        SettingsCard {
-
-            CameraOption(
-                title = "Back Camera",
-                subtitle =
-                    "Recommended for barcode scanning",
-                selected =
-                    cameraMode ==
-                            CameraMode.BACK,
-                onClick = {
-                    onCameraChange(
-                        CameraMode.BACK
-                    )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+        ) {
+            
+            // GENERAL
+            Spacer(modifier = Modifier.height(16.dp))
+            SectionTitle(text = "GENERAL", modifier = Modifier.padding(horizontal = 24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            SettingActionRow(
+                icon = Icons.Default.Settings,
+                title = "Theme",
+                subtitle = currentTheme,
+                onClick = { 
+                    val next = when(currentTheme) {
+                        "System" -> "Light"
+                        "Light" -> "Dark"
+                        else -> "System"
+                    }
+                    onThemeChange(next)
                 }
             )
-
             DividerLine()
-
-            CameraOption(
-                title = "Front Camera",
-                subtitle =
-                    "Use the front-facing camera",
-                selected =
-                    cameraMode ==
-                            CameraMode.FRONT,
-                onClick = {
-                    onCameraChange(
-                        CameraMode.FRONT
-                    )
+            SettingActionRow(
+                icon = Icons.Default.Settings,
+                title = "Accent Color",
+                subtitle = currentAccent,
+                onClick = { 
+                    val next = when(currentAccent) {
+                        "Blue" -> "Green"
+                        "Green" -> "Orange"
+                        else -> "Blue"
+                    }
+                    onAccentChange(next)
                 }
             )
-        }
-
-        Spacer(
-            modifier = Modifier.height(24.dp)
-        )
-
-        /* DEVICE */
-
-        SectionTitle("DEVICE")
-
-        Spacer(
-            modifier = Modifier.height(10.dp)
-        )
-
-        SettingsCard {
-
+            DividerLine()
             SettingSwitchRow(
                 icon = Icons.Default.Videocam,
                 title = "Keep Screen Awake",
-                subtitle =
-                    "Prevent the display from sleeping while scanning",
+                subtitle = "Prevent the display from sleeping",
                 checked = keepScreenAwake,
-                onCheckedChange =
-                    onKeepScreenAwakeChange
+                onCheckedChange = onKeepScreenAwakeChange
             )
 
+            // CAMERA
+            Spacer(modifier = Modifier.height(24.dp))
+            SectionTitle(text = "CAMERA", modifier = Modifier.padding(horizontal = 24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            CameraOption(
+                title = "Back Camera",
+                subtitle = "Recommended for barcode scanning",
+                selected = cameraMode == CameraMode.BACK,
+                onClick = { onCameraChange(CameraMode.BACK) }
+            )
             DividerLine()
+            CameraOption(
+                title = "Front Camera",
+                subtitle = "Use the front-facing camera",
+                selected = cameraMode == CameraMode.FRONT,
+                onClick = { onCameraChange(CameraMode.FRONT) }
+            )
+            DividerLine()
+            SettingSwitchRow(
+                icon = if (torchEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                title = "Camera Torch",
+                subtitle = if (torchEnabled) "Torch is enabled" else "Torch is disabled",
+                checked = torchEnabled,
+                onCheckedChange = onTorchChange
+            )
 
+            // STREAMING
+            Spacer(modifier = Modifier.height(24.dp))
+            SectionTitle(text = "STREAMING", modifier = Modifier.padding(horizontal = 24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            SettingSwitchRow(
+                icon = Icons.Default.Settings,
+                title = "Auto-start Server",
+                subtitle = "Start server when app opens",
+                checked = autoStartServer,
+                onCheckedChange = onAutoStartChange
+            )
+            DividerLine()
+            SettingActionRow(
+                icon = Icons.Default.Settings,
+                title = "Stream FPS",
+                subtitle = "$streamFps fps",
+                onClick = { 
+                    val next = when(streamFps) {
+                        12 -> 24
+                        24 -> 30
+                        30 -> 8
+                        else -> 12
+                    }
+                    onFpsChange(next)
+                }
+            )
+            DividerLine()
+            SettingActionRow(
+                icon = Icons.Default.Settings,
+                title = "Stream Quality",
+                subtitle = "$streamQuality%",
+                onClick = { 
+                    val next = when(streamQuality) {
+                        72 -> 90
+                        90 -> 50
+                        else -> 72
+                    }
+                    onQualityChange(next)
+                }
+            )
+
+            // NETWORK
+            Spacer(modifier = Modifier.height(24.dp))
+            SectionTitle(text = "NETWORK", modifier = Modifier.padding(horizontal = 24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            
             SettingInfoRow(
                 icon = Icons.Default.Wifi,
-                title = "Network Camera",
-                subtitle =
-                    if (serverRunning) {
-                        "Camera server is running"
-                    } else {
-                        "Camera server is stopped"
-                    },
-                status =
-                    if (serverRunning) {
-                        "READY"
-                    } else {
-                        "OFF"
+                title = "Network Server",
+                subtitle = if (serverRunning) "Running on port $SERVER_PORT" else "Server stopped",
+                status = if (serverRunning) "READY" else "OFF"
+            )
+            
+            if (streamUrl.isNotEmpty()) {
+                DividerLine()
+                SettingActionRow(
+                    icon = Icons.Default.ContentCopy,
+                    title = "Copy Stream URL",
+                    subtitle = streamUrl,
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("QuickBill Stream URL", streamUrl))
                     }
+                )
+            }
+            DividerLine()
+            SettingActionRow(
+                icon = Icons.Default.Settings,
+                title = "Restart Camera Server",
+                subtitle = "Restart if connection is dropped",
+                onClick = onRestartServer
             )
-        }
 
-        Spacer(
-            modifier = Modifier.height(24.dp)
-        )
-
-        /* TORCH */
-
-        SectionTitle("TORCH")
-
-        Spacer(
-            modifier = Modifier.height(10.dp)
-        )
-
-        SettingsCard {
-
-            SettingSwitchRow(
-                icon =
-                    if (torchEnabled) {
-                        Icons.Default.FlashOn
-                    } else {
-                        Icons.Default.FlashOff
-                    },
-                title = "Camera Torch",
-                subtitle =
-                    if (torchEnabled) {
-                        "Torch is enabled"
-                    } else {
-                        "Torch is disabled"
-                    },
-                checked = torchEnabled,
-                onCheckedChange =
-                    onTorchChange
-            )
-        }
-
-        Spacer(
-            modifier = Modifier.height(24.dp)
-        )
-
-        /* NETWORK CAMERA */
-
-        SectionTitle("NETWORK CAMERA")
-
-        Spacer(
-            modifier = Modifier.height(10.dp)
-        )
-
-        SettingsCard {
+            // ABOUT
+            Spacer(modifier = Modifier.height(32.dp))
 
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Image(
+                    painter = painterResource(id = R.drawable.quickbill_logo_full),
+                    contentDescription = "QuickBill",
+                    modifier = Modifier.height(32.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "See Documentation",
+                    color = Color(0xFF2563EB),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.clickable {
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://quickbill.kartikbansode.dev/documentation")
+                        )
+                        context.startActivity(intent)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "Version 1.1.0",
+                    color = TextSecondary,
+                    fontSize = 14.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
-                    verticalAlignment =
-                        Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (serverRunning) {
-                                    Green
-                                } else {
-                                    Color(0xFFEF4444)
-                                }
+                    Text(
+                        text = "Privacy",
+                        color = Color(0xFF2563EB),
+                        fontSize = 13.sp,
+                        modifier = Modifier.clickable {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://quickbill.kartikbansode.dev/privacy")
                             )
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.width(10.dp)
+                            context.startActivity(intent)
+                        }
                     )
 
                     Text(
-                        text =
-                            if (serverRunning) {
-                                "SERVER RUNNING"
-                            } else {
-                                "SERVER STOPPED"
-                            },
-                        color =
-                            if (serverRunning) {
-                                Green
-                            } else {
-                                Color(0xFFEF4444)
-                            },
+                        text = "  •  ",
+                        color = TextSecondary,
+                        fontSize = 13.sp
+                    )
+
+                    Text(
+                        text = "Terms",
+                        color = Color(0xFF2563EB),
                         fontSize = 13.sp,
-                        fontWeight =
-                            FontWeight.Bold,
-                        letterSpacing = 1.sp
+                        modifier = Modifier.clickable {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://quickbill.kartikbansode.dev/terms")
+                            )
+                            context.startActivity(intent)
+                        }
                     )
                 }
 
-                Spacer(
-                    modifier =
-                        Modifier.height(20.dp)
-                )
+                Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = "Stream URL",
-                    color = TextSecondary,
-                    fontSize = 12.sp,
-                    fontWeight =
-                        FontWeight.Bold
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.height(7.dp)
-                )
-
-                Box(
+                Button(
+                    onClick = onResetSettings,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFEF4444)
+                    ),
                     modifier = Modifier
+                        .padding(horizontal = 24.dp)
                         .fillMaxWidth()
-                        .clip(
-                            RoundedCornerShape(12.dp)
-                        )
-                        .background(
-                            Color(0xFF091524)
-                        )
-                        .border(
-                            1.dp,
-                            Border,
-                            RoundedCornerShape(12.dp)
-                        )
-                        .padding(14.dp)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-
                     Text(
-                        text =
-                            if (
-                                streamUrl.isNotEmpty()
-                            ) {
-                                streamUrl
-                            } else {
-                                "Detecting device IP..."
-                            },
-                        color =
-                            Color(0xFFBFDBFE),
+                        text = "Reset Default Settings",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
                 }
 
-                Spacer(
-                    modifier =
-                        Modifier.height(14.dp)
-                )
-
-                Button(
-                    onClick = {
-
-                        if (
-                            streamUrl.isNotEmpty()
-                        ) {
-
-                            val clipboard =
-                                context.getSystemService(
-                                    Context.CLIPBOARD_SERVICE
-                                ) as ClipboardManager
-
-                            clipboard.setPrimaryClip(
-                                android.content.ClipData
-                                    .newPlainText(
-                                        "QuickBill Stream URL",
-                                        streamUrl
-                                    )
-                            )
-                        }
-                    },
-                    modifier =
-                        Modifier.fillMaxWidth(),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor =
-                                BrandBlue
-                        ),
-                    shape =
-                        RoundedCornerShape(12.dp)
-                ) {
-
-                    Icon(
-                        imageVector =
-                            Icons.Default.ContentCopy,
-                        contentDescription =
-                            null,
-                        modifier =
-                            Modifier.size(19.dp)
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.width(8.dp)
-                    )
-
-                    Text(
-                        text = "COPY STREAM URL",
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-                }
-
-                Spacer(
-                    modifier =
-                        Modifier.height(10.dp)
-                )
-
-                OutlinedButton(
-                    onClick =
-                        onRestartServer,
-                    modifier =
-                        Modifier.fillMaxWidth(),
-                    shape =
-                        RoundedCornerShape(12.dp)
-                ) {
-
-                    Text(
-                        text =
-                            "RESTART CAMERA SERVER",
-                        color = Color.White,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-                }
+                Spacer(modifier = Modifier.height(48.dp))
             }
         }
-
-        Spacer(
-            modifier = Modifier.height(24.dp)
-        )
-
-        /* HOW TO CONNECT */
-
-        SectionTitle("HOW TO CONNECT")
-
-        Spacer(
-            modifier = Modifier.height(10.dp)
-        )
-
-        SettingsCard {
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp)
-            ) {
-
-                InstructionRow(
-                    number = "1",
-                    text =
-                        "Keep this phone and the QuickBill computer on the same Wi-Fi network."
-                )
-
-                InstructionRow(
-                    number = "2",
-                    text =
-                        "Copy the Stream URL shown above."
-                )
-
-                InstructionRow(
-                    number = "3",
-                    text =
-                        "Paste the URL into QuickBill Desktop camera settings."
-                )
-
-                InstructionRow(
-                    number = "4",
-                    text =
-                        "QuickBill Desktop will read the camera stream and scan barcodes."
-                )
-            }
-        }
-
-        Spacer(
-            modifier = Modifier.height(24.dp)
-        )
-
-        /* ABOUT */
-
-        SectionTitle("ABOUT")
-
-        Spacer(
-            modifier = Modifier.height(10.dp)
-        )
-
-        SettingsCard {
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp),
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(
-                            RoundedCornerShape(13.dp)
-                        )
-                        .background(
-                            BrandBlue
-                        ),
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-
-                    Icon(
-                        imageVector =
-                            Icons.Default.Videocam,
-                        contentDescription =
-                            null,
-                        tint = Color.White
-                    )
-                }
-
-                Spacer(
-                    modifier =
-                        Modifier.width(14.dp)
-                )
-
-                Column {
-
-                    Text(
-                        text =
-                            "QuickBill - Barcode Scanner",
-                        color = TextPrimary,
-                        fontSize = 16.sp,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    Text(
-                        text =
-                            "Network camera companion",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
-
-                    Text(
-                        text = "Version 1.0.0",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(
-            modifier = Modifier.height(25.dp)
-        )
     }
 }
 
@@ -1534,45 +1230,65 @@ private fun SettingInfoRow(
 }
 
 @Composable
-private fun SectionTitle(
-    text: String
+private fun SettingActionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
 ) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(SurfaceLight),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(23.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = subtitle,
+                color = TextSecondary,
+                fontSize = 12.sp
+            )
+        }
+    }
+}
 
+
+@Composable
+private fun SectionTitle(
+    text: String,
+    modifier: Modifier = Modifier
+) {
     Text(
         text = text,
         color = TextSecondary,
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
-        letterSpacing = 1.8.sp
+        letterSpacing = 1.8.sp,
+        modifier = modifier
     )
-}
-
-@Composable
-private fun SettingsCard(
-    content: @Composable ColumnScope.() -> Unit
-) {
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape =
-            RoundedCornerShape(17.dp),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = Surface
-            ),
-        border =
-            BorderStroke(
-                1.dp,
-                Border
-            )
-    ) {
-
-        Column(
-            modifier =
-                Modifier.fillMaxWidth(),
-            content = content
-        )
-    }
 }
 
 @Composable
@@ -1582,58 +1298,26 @@ private fun CameraOption(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(
-                RoundedCornerShape(12.dp)
-            )
-            .clickable(
-                onClick = onClick
-            )
-            .background(
-                if (selected) {
-                    BrandBlue.copy(
-                        alpha = 0.10f
-                    )
-                } else {
-                    Color.Transparent
-                }
-            )
-            .padding(17.dp),
-        verticalAlignment =
-            Alignment.CenterVertically
+            .clickable(onClick = onClick)
+            .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-
         RadioButton(
             selected = selected,
             onClick = onClick
         )
-
-        Spacer(
-            modifier =
-                Modifier.width(10.dp)
-        )
-
-        Column(
-            modifier =
-                Modifier.weight(1f)
-        ) {
-
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 color = TextPrimary,
                 fontSize = 16.sp,
-                fontWeight =
-                    FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold
             )
-
-            Spacer(
-                modifier =
-                    Modifier.height(3.dp)
-            )
-
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = subtitle,
                 color = TextSecondary,
@@ -1645,7 +1329,6 @@ private fun CameraOption(
 
 @Composable
 private fun DividerLine() {
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1654,71 +1337,18 @@ private fun DividerLine() {
     )
 }
 
-@Composable
-private fun InstructionRow(
-    number: String,
-    text: String
-) {
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                vertical = 9.dp
-            ),
-        verticalAlignment =
-            Alignment.Top
-    ) {
-
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(
-                    BrandBlue.copy(
-                        alpha = 0.18f
-                    )
-                ),
-            contentAlignment =
-                Alignment.Center
-        ) {
-
-            Text(
-                text = number,
-                color =
-                    Color(0xFF93C5FD),
-                fontSize = 13.sp,
-                fontWeight =
-                    FontWeight.Bold
-            )
-        }
-
-        Spacer(
-            modifier =
-                Modifier.width(12.dp)
-        )
-
-        Text(
-            text = text,
-            modifier =
-                Modifier.weight(1f),
-            color =
-                Color(0xFFCBD5E1),
-            fontSize = 13.sp,
-            lineHeight = 19.sp
-        )
-    }
-}
-
 /* ============================================================
    CAMERA
    ============================================================ */
+
+private val analysisExecutor = Executors.newSingleThreadExecutor()
 
 private fun startCamera(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     previewView: PreviewView,
     cameraMode: CameraMode,
+    server: CameraStreamServer,
     onCameraReady: (Camera) -> Unit
 ) {
 
@@ -1773,11 +1403,28 @@ private fun startCamera(
                 previewView.surfaceProvider
             )
 
+            val imageAnalysis = ImageAnalysis.Builder()
+                .setTargetResolution(android.util.Size(1280, 720))
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                .build()
+
+            imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
+                try {
+                    val bitmap = imageProxy.toBitmap()
+                    server.updateFrame(bitmap)
+                } catch (_: Exception) {
+                } finally {
+                    imageProxy.close()
+                }
+            }
+
             val newCamera =
                 provider.bindToLifecycle(
                     lifecycleOwner,
                     selector,
-                    preview
+                    preview,
+                    imageAnalysis
                 )
 
             onCameraReady(
@@ -1816,59 +1463,40 @@ private fun getLocalIpAddress(
 ): String {
 
     /*
-     * First try NetworkInterface.
+     * First try NetworkInterface, prioritizing wifi interfaces.
      */
     try {
+        val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
+        var fallbackIp = ""
 
-        val interfaces =
-            Collections.list(
-                NetworkInterface
-                    .getNetworkInterfaces()
-            )
+        for (networkInterface in interfaces) {
+            if (!networkInterface.isUp || networkInterface.isLoopback) continue
 
-        for (
-        networkInterface
-        in interfaces
-        ) {
+            val name = networkInterface.name.lowercase()
+            val isWifi = name.contains("wlan") || name.contains("ap") || name.contains("wifi")
+            val isCellular = name.contains("rmnet") || name.contains("pdp") || name.contains("ccmni")
 
-            if (
-                !networkInterface.isUp ||
-                networkInterface.isLoopback
-            ) {
-                continue
-            }
+            if (isCellular) continue
 
-            val addresses =
-                Collections.list(
-                    networkInterface.inetAddresses
-                )
-
-            for (
-            address
-            in addresses
-            ) {
-
-                if (
-                    address is Inet4Address &&
-                    !address.isLoopbackAddress
-                ) {
-
-                    val ip =
-                        address.hostAddress
-
-                    if (
-                        ip != null &&
-                        ip.isNotEmpty()
-                    ) {
-
-                        return ip
+            val addresses = Collections.list(networkInterface.inetAddresses)
+            for (address in addresses) {
+                if (address is Inet4Address && !address.isLoopbackAddress) {
+                    val ip = address.hostAddress
+                    if (ip != null && ip.isNotEmpty()) {
+                        if (isWifi) {
+                            return ip // Strongly prefer wifi
+                        } else if (fallbackIp.isEmpty()) {
+                            fallbackIp = ip
+                        }
                     }
                 }
             }
         }
-
-    } catch (_: Exception) {
-    }
+        
+        if (fallbackIp.isNotEmpty()) {
+            return fallbackIp
+        }
+    } catch (_: Exception) {}
 
     /*
      * Fallback to ConnectivityManager.

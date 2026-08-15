@@ -22,6 +22,12 @@ class CameraStreamServer(
     private val runningClients =
         CopyOnWriteArrayList<InputStream>()
 
+    private val clientThreads =
+        CopyOnWriteArrayList<Thread>()
+
+    var jpegQuality: Int = 72
+    var targetFps: Int = 12
+
     fun updateFrame(bitmap: Bitmap) {
 
         val output =
@@ -29,7 +35,7 @@ class CameraStreamServer(
 
         bitmap.compress(
             Bitmap.CompressFormat.JPEG,
-            72,
+            jpegQuality,
             output
         )
 
@@ -155,7 +161,7 @@ class CameraStreamServer(
 
         runningClients.add(pipeInput)
 
-        Thread {
+        val thread = Thread {
 
             try {
 
@@ -192,7 +198,8 @@ class CameraStreamServer(
                         pipeOutput.flush()
                     }
 
-                    Thread.sleep(80)
+                    val sleepTime = 1000L / targetFps.coerceAtLeast(1)
+                    Thread.sleep(sleepTime)
                 }
 
             } catch (_: Exception) {
@@ -215,11 +222,12 @@ class CameraStreamServer(
                 }
             }
 
-        }.apply {
-            name = "QuickBill-MJPEG-Client"
-            isDaemon = true
-            start()
         }
+
+        thread.name = "QuickBill-MJPEG-Client"
+        thread.isDaemon = true
+        clientThreads.add(thread)
+        thread.start()
 
         return newChunkedResponse(
             Response.Status.OK,
@@ -239,7 +247,15 @@ class CameraStreamServer(
             }
         }
 
+        for (thread in clientThreads) {
+            try {
+                thread.interrupt()
+            } catch (_: Exception) {
+            }
+        }
+
         runningClients.clear()
+        clientThreads.clear()
 
         super.stop()
     }

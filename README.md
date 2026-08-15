@@ -31,16 +31,18 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/kartikbansode/quickbill-barcode-scanner-app/releases/download/v1.0.0/QuickBill-Barcode-Scanner-v1.0.0.apk">
-    <strong>Download Android App v1.0.0</strong>
+  <a href="https://github.com/kartikbansode/quickbill-barcode-scanner-app/releases/download/v1.1.0/QuickBill-Barcode-Scanner-v1.1.0.apk">
+    <strong>Download Android App v1.1.0</strong>
   </a>
+  <br>
+  <em>First Stable Release</em>
 </p>
 
 <p align="center">
   <a href="https://github.com/kartikbansode/quickbill-barcode-scanner/releases">
     <img
-      src="https://img.shields.io/badge/Releases-Download-blue"
-      alt="Releases"
+      src="https://img.shields.io/badge/Release-v1.1.0-blue"
+      alt="Release v1.1.0"
     />
   </a>
 
@@ -75,16 +77,16 @@
 <p align="center">
   QuickBill Barcode Scanner is a companion Android application designed
   to work with the QuickBill Desktop billing system. It provides a
-  dedicated mobile barcode-scanning interface for quickly scanning
-  products and sending barcode information to the desktop application
-  for use in billing and product workflows.
+  dedicated mobile camera streaming interface for scanning
+  products and streaming camera frames directly to the desktop application
+  for high-performance barcode detection in billing workflows.
 </p>
 
 <p align="center">
   <strong>Part of the QuickBill Ecosystem</strong>
   <br>
   QuickBill Desktop remains the core billing system and authoritative
-  source for products, inventory, bills, payments and transactions.
+  source for products, inventory, bills, payments, and barcode detection.
 </p>
 
 <p align="center">
@@ -100,22 +102,41 @@
   &nbsp;·&nbsp;
   Companion Android application for real-time customer-facing billing,
   payment, QR and transaction display
+  <br>
+  <a href="https://quickbill.kartikbansode.dev/documentation">
+    Official Documentation
+  </a>
 </p>
 
+## What's New in v1.1.0
+
+- **Professional UI/UX Redesign:** Clean, restrained enterprise companion interface optimized for barcode scanning utility.
+- **Robust Settings & Back Navigation:** Back navigation from Settings smoothly returns to the camera view without closing the app or interrupting the stream.
+- **Optimized CameraX ImageAnalysis Pipeline:** Low-overhead background frame processing powering high-efficiency MJPEG HTTP streaming to QuickBill Desktop.
+- **Configurable Stream Quality & FPS:** Customize JPEG quality (50%, 72%, 90%) and frame rates (8, 12, 24, 30 FPS).
+- **Intelligent Local IP Detection:** Prioritizes local Wi-Fi interfaces with auto-recovery and live connection status indicators.
+- **Theme & Accent Customization:** Full support for System, Light, and Dark themes with customizable accent colors.
+- **Camera Selection & Torch Controls:** Quick toggling between Back and Front cameras with built-in torch assistance.
+- **Keep Screen Awake:** Optional display awake management while scanning.
+- **One-Tap Stream URL Copy:** Fast clipboard copy for effortless pairing with QuickBill Desktop.
+- **Official QuickBill Brand Identity:** Fully integrated official branding and links to Documentation, Privacy, and Terms.
+
+---
 
 ## Features
 
 - Android Camera Barcode Scanner
-- Real-time Barcode Detection
-- Network Camera Streaming
-- QuickBill Desktop Integration
-- Automatic IP Address Configuration
-- Continuous Scanning
-- Duplicate Scan Prevention
-- Camera Selection
-- Scanner Settings & Customization
+- Low-latency Network MJPEG Camera Streaming
+- QuickBill Desktop Integration (HTTP MJPEG on port 8080)
+- Automatic Wi-Fi IP Address Detection
+- Configurable Stream FPS & Image Quality
+- Camera Selection (Front / Back)
+- Integrated Camera Torch Support
+- Keep Screen Awake Option
+- Custom Theme & Accent Color Customization
+- Instant Settings Persistence & Reset Option
 - Low CPU & Battery Usage
-- Professional QuickBill UI
+- Professional Commercial POS UI
 
 ---
 
@@ -124,7 +145,7 @@
 - Android 8.0 (API 26) or higher
 - Android device with camera
 - QuickBill Desktop
-- Android device and desktop connected to the same network
+- Android device and desktop connected to the same local network
 
 ---
 
@@ -143,6 +164,14 @@ This application is designed to work with:
 **QuickBill Desktop Billing System**
 
 The Android device acts as a wireless barcode scanner for the desktop billing application.
+
+---
+
+## Official Links
+
+- **Documentation:** https://quickbill.kartikbansode.dev/documentation
+- **Privacy Policy:** https://quickbill.kartikbansode.dev/privacy
+- **Terms of Service:** https://quickbill.kartikbansode.dev/terms
 
 ---
 
